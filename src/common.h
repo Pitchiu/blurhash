@@ -10,7 +10,7 @@ int linearTosRGB(float value) {
 	else return (1.055 * powf(v, 1 / 2.4) - 0.055) * 255 - 0.5;
 }
 
-__device__ float sRGBToLinear(int value) {
+__device__ float sRGBToLinear(uint8_t value) {
 	float v = (float)value / 255;
 	if (v <= 0.04045) return v / 12.92;
 	else return powf((v + 0.055) / 1.055, 2.4);

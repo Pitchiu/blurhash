@@ -16,7 +16,7 @@
 const char* blurHashForPixels(int xComponents, int yComponents, int width, int height, uint8_t* pixels, size_t bytesPerRow);
 const char* blurHashForFile(int xComponents, int yComponents, const char* filename);
 char* encode_int(int value, int length, char* destination);
-void multiplyBasisFunction(int xComponent, int yComponent, int width, int height, uint8_t* pixels, float result[3]);
+void multiplyBasisFunction(int xComponent, int yComponent, int width, int height, uint8_t* pixels, float result[3], float* vec_r,float* vec_g,float* vec_b );
 int encodeAC(float r, float g, float b, float maximumValue);
 int encodeDC(float r, float g, float b);
 
@@ -84,7 +84,6 @@ const char* blurHashForFile(int xComponents, int yComponents, const char* filena
 	int width, height, channels;
 
 	unsigned char* data = stbi_load(filename, &width, &height, &channels, 3);
-	data = stbi_load(filename, &width, &height, &channels, 3);
 	if (!data) return NULL;
 
 	const char* hash = blurHashForPixels(xComponents, yComponents, width, height, data, width * 3);
@@ -104,16 +103,27 @@ const char* blurHashForPixels(int xComponents, int yComponents, int width, int h
 	CHECK_CUDA_ERROR(cudaMalloc(&pixels, N*3*sizeof(uint8_t)));
 	CHECK_CUDA_ERROR(cudaMemcpy(pixels, data, N*3*sizeof(uint8_t), cudaMemcpyHostToDevice));
 
+	float* vec_r;
+	float* vec_g;
+	float* vec_b;
+
+	cudaMalloc((void**)&vec_r, sizeof(float)*N);
+	cudaMalloc((void**)&vec_g, sizeof(float)*N);
+	cudaMalloc((void**)&vec_b, sizeof(float)*N);
+
 	for (int y = 0; y < yComponents; y++) {
 		for (int x = 0; x < xComponents; x++) {
 			float factor[3];
-			multiplyBasisFunction(x, y, width, height, pixels, factor);
+			multiplyBasisFunction(x, y, width, height, pixels, factor, vec_r, vec_g, vec_b);
 			factors[y * xComponents * 3 + x * 3 + 0] = factor[0];
 			factors[y * xComponents * 3 + x * 3 + 1] = factor[1];
 			factors[y * xComponents * 3 + x * 3 + 2] = factor[2];
 		}
 	}
 
+	cudaFree(vec_r);
+	cudaFree(vec_g);
+	cudaFree(vec_b);
 	CHECK_CUDA_ERROR(cudaFree(pixels));
 
 
@@ -163,25 +173,18 @@ __global__ void calculatePixelColors(uint8_t* pixels, float* vec_r, float* vec_g
 		int row = globalId / width;	//row
 		int col = globalId - row*width;	//col
 		float basis = cosf(M_PI * xComponent * col / width) * cosf(M_PI * yComponent * row / height);
+
 		vec_r[globalId] = basis * sRGBToLinear(pixels[3*globalId]);
 		vec_g[globalId] = basis * sRGBToLinear(pixels[3*globalId + 1]);
 		vec_b[globalId] = basis * sRGBToLinear(pixels[3*globalId + 2]);
 	}
 }
 
-void multiplyBasisFunction(int xComponent, int yComponent, int width, int height, uint8_t* pixels, float result[3])
+void multiplyBasisFunction(int xComponent, int yComponent, int width, int height, uint8_t* pixels, float result[3],  float* vec_r,float* vec_g,float* vec_b)
 {
 	float r = 0, g = 0, b = 0;
 	float normalisation = (xComponent == 0 && yComponent == 0) ? 1 : 2;
 	int N = width * height;
-
-	float* vec_r;
-	float* vec_g;
-	float* vec_b;
-
-	cudaMalloc((void**)&vec_r, sizeof(float)*N);
-	cudaMalloc((void**)&vec_g, sizeof(float)*N);
-	cudaMalloc((void**)&vec_b, sizeof(float)*N);
 
 	int numblocks = N/1024 + 1;
 	calculatePixelColors<<<numblocks, 1024>>>(pixels, vec_r, vec_g, vec_b, xComponent, yComponent, width, height);
@@ -195,10 +198,6 @@ void multiplyBasisFunction(int xComponent, int yComponent, int width, int height
 	r = thrust::reduce(r_ptr, r_ptr + N, (float) 0);
 	g = thrust::reduce(g_ptr, g_ptr + N, (float) 0);
 	b = thrust::reduce(b_ptr, b_ptr + N, (float) 0);
-
-	cudaFree(vec_r);
-	cudaFree(vec_g);
-	cudaFree(vec_b);
 
 	float scale = normalisation / (width * height);
 
