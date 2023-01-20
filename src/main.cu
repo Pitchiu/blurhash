@@ -1,6 +1,7 @@
 #include <vector>
 #include <iostream>
 #include <string>
+
 #include <cuda_runtime.h>
 
 #include <thrust/device_vector.h>
@@ -11,6 +12,7 @@
 #include "stb_image.h"
 #include "common.h"
 #include "timer.h"
+#include "parser.h"
 
 
 const char* blurHashForPixels(int xComponents, int yComponents, int width, int height, uint8_t* pixels, size_t bytesPerRow);
@@ -48,30 +50,26 @@ void checkLast(const char* const file, const int line)
 
 int main(int argc, char **argv) 
 {
-	if(argc != 4)
-	{
-		fprintf(stderr, "Usage: %s x_components y_components imagefile\n", argv[0]);
-		return 1;
-	}
+	ProgramOptions options;
+	if(!parseInput(argc, argv, options))
+		return -1;
 
-	int xComponents = atoi(argv[1]);
-	int yComponents = atoi(argv[2]);
-	char* filename = argv[3];
+	int xComponents = options.xComponents;
+	int yComponents = options.yComponents;
 
 	Stopwatch<> timer;
-	const char* hash = blurHashForFile(xComponents, yComponents, filename);
-	for(int i=0; i<99; i++)
+	for (auto const& filename : options.images)
 	{
-		const char* br = blurHashForFile(xComponents, yComponents, filename);
+		std::string path(options.path + filename);
+		const char* hash = blurHashForFile(xComponents, yComponents, path.c_str());
 
+		if (!hash)
+		{
+			fprintf(stderr, "Failed to load image file \"%s\".\n", path.c_str());
+			return 1;
+		}
+		printf("%s\n", hash);
 	}
-
-	if (!hash)
-	{
-		fprintf(stderr, "Failed to load image file \"%s\".\n", filename);
-		return 1;
-	}
-	printf("%s\n", hash);
 
 	auto time = timer.elapsed_time<unsigned int, std::chrono::milliseconds>();
 	printf("Time elapsed: %dms\n", time);
@@ -107,9 +105,9 @@ const char* blurHashForPixels(int xComponents, int yComponents, int width, int h
 	float* vec_g;
 	float* vec_b;
 
-	cudaMalloc((void**)&vec_r, sizeof(float)*N);
-	cudaMalloc((void**)&vec_g, sizeof(float)*N);
-	cudaMalloc((void**)&vec_b, sizeof(float)*N);
+	CHECK_CUDA_ERROR(cudaMalloc((void**)&vec_r, sizeof(float)*N));
+	CHECK_CUDA_ERROR(cudaMalloc((void**)&vec_g, sizeof(float)*N));
+	CHECK_CUDA_ERROR(cudaMalloc((void**)&vec_b, sizeof(float)*N));
 
 	for (int y = 0; y < yComponents; y++) {
 		for (int x = 0; x < xComponents; x++) {
@@ -121,9 +119,9 @@ const char* blurHashForPixels(int xComponents, int yComponents, int width, int h
 		}
 	}
 
-	cudaFree(vec_r);
-	cudaFree(vec_g);
-	cudaFree(vec_b);
+	CHECK_CUDA_ERROR(cudaFree(vec_r));
+	CHECK_CUDA_ERROR(cudaFree(vec_g));
+	CHECK_CUDA_ERROR(cudaFree(vec_b));
 	CHECK_CUDA_ERROR(cudaFree(pixels));
 
 
@@ -136,9 +134,11 @@ const char* blurHashForPixels(int xComponents, int yComponents, int width, int h
 	ptr = encode_int(sizeFlag, 1, ptr);
 
 	float maximumValue;
-	if (acCount > 0) {
+	if (acCount > 0)
+	{
 		float actualMaximumValue = 0;
-		for (int i = 0; i < acCount * 3; i++) {
+		for (int i = 0; i < acCount * 3; i++)
+		{
 			actualMaximumValue = fmaxf(fabsf(ac[i]), actualMaximumValue);
 		}
 
@@ -146,20 +146,22 @@ const char* blurHashForPixels(int xComponents, int yComponents, int width, int h
 		maximumValue = ((float)quantisedMaximumValue + 1) / 166;
 		ptr = encode_int(quantisedMaximumValue, 1, ptr);
 	}
-	else {
+	else
+	{
 		maximumValue = 1;
 		ptr = encode_int(0, 1, ptr);
 	}
 
 	ptr = encode_int(encodeDC(dc[0], dc[1], dc[2]), 4, ptr);
 
-	for (int i = 0; i < acCount; i++) {
+	for (int i = 0; i < acCount; i++)
+	{
 		ptr = encode_int(encodeAC(ac[i * 3 + 0], ac[i * 3 + 1], ac[i * 3 + 2], maximumValue), 2, ptr);
 	}
 
 	*ptr = 0;
-	delete[] factors;
 
+	delete[] factors;
 	return buffer;
 }
 
@@ -189,7 +191,6 @@ void multiplyBasisFunction(int xComponent, int yComponent, int width, int height
 	int numblocks = N/1024 + 1;
 	calculatePixelColors<<<numblocks, 1024>>>(pixels, vec_r, vec_g, vec_b, xComponent, yComponent, width, height);
 	cudaDeviceSynchronize();
-	CHECK_LAST_CUDA_ERROR();
 
 	thrust::device_ptr<float> r_ptr(vec_r);
 	thrust::device_ptr<float> g_ptr(vec_g);
