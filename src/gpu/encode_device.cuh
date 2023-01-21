@@ -2,16 +2,18 @@
 #include <thrust/device_malloc.h>
 
 #include <iostream>
+#include "../common/parser.h"
+
 #include "errors.cuh"
 #include "kernels.cuh"
-#include "parser.cuh"
+
 
 struct compare
 {
   __host__ __device__
   bool operator()(float lhs, float rhs)
   {
-	return fabsf(lhs) < fabsf(rhs);
+  return fabsf(lhs) < fabsf(rhs);
   }
 };
 

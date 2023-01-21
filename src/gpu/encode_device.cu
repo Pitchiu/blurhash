@@ -1,8 +1,8 @@
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-#include "common.h"
+#include "../common/stb_image.h"
 
 #include "encode_device.cuh"
+#include "../common/common.h"
 
 void encodeDevice(const ProgramOptions& options)
 {

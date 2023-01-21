@@ -1,3 +1,6 @@
+#ifndef __BLURHASH_PARSER_H__
+#define __BLURHASH_PARSER_H__
+
 #include <string>
 #include <algorithm>
 #include <list>
@@ -24,4 +27,4 @@ struct ProgramOptions
 
 bool parseInput(int argc, char **argv, ProgramOptions &programOptions);
 
-
+#endif

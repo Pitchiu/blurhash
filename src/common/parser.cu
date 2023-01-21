@@ -1,4 +1,4 @@
-#include "parser.cuh"
+#include "parser.h"
 
 char* getCmdOption(char ** begin, char ** end, const std::string & option)
 {
