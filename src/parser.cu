@@ -1,9 +1,4 @@
-#include "parser.h"
-#include <algorithm>
-#include <iostream>
-#include <string>
-#include <dirent.h>
-#include <boost/algorithm/string/predicate.hpp>
+#include "parser.cuh"
 
 char* getCmdOption(char ** begin, char ** end, const std::string & option)
 {
@@ -133,9 +128,9 @@ bool parseComponents(int argc, char **argv, ProgramOptions& options)
 
 bool parseInput(int argc, char **argv, ProgramOptions &options)
 {
-    if(cmdOptionExists(argv, argv+argc, "-h"))
+    if(cmdOptionExists(argv, argv+argc, "-h") || argc==1)
     {
-        printf("printing help message\n");
+        printf("Usage: blurhash -d {directory_path} -m [gpu|cpu|comparison] -x {components_x} -y {components_y} \n");
         return false;
     }
 

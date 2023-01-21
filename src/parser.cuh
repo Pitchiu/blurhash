@@ -1,6 +1,10 @@
 #include <string>
 #include <algorithm>
 #include <list>
+#include <iostream>
+#include <string>
+#include <dirent.h>
+#include <boost/algorithm/string/predicate.hpp>
 
 enum Mode
 {

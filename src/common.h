@@ -1,23 +1,35 @@
-#include<math.h>
+#include <math.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
-int linearTosRGB(float value) {
+constexpr char characters[84] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~";
+
+int linearTosRGB(float value)
+{
 	float v = fmaxf(0, fminf(1, value));
 	if (v <= 0.0031308) return v * 12.92 * 255 - 0.5;
 	else return (1.055 * powf(v, 1 / 2.4) - 0.055) * 255 - 0.5;
 }
 
-__device__ float sRGBToLinear(uint8_t value) {
-	float v = (float)value / 255;
-	if (v <= 0.04045) return v / 12.92;
-	else return powf((v + 0.055) / 1.055, 2.4);
+int encodeDC(float r, float g, float b)
+{
+	int roundedR = linearTosRGB(r);
+	int roundedG = linearTosRGB(g);
+	int roundedB = linearTosRGB(b);
+	return (roundedR << 16) + (roundedG << 8) + roundedB;
 }
 
-float signPow(float value, float exp) {
-	return copysignf(powf(fabsf(value), exp), value);
-}
+char* encodeInt(int value, int length, char* destination)
+{
+	int divisor = 1;
+	for (int i = 0; i < length - 1; i++) divisor *= 83;
 
-constexpr char characters[84] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#$%*+,-.:;=?@[]^_{|}~";
+	for (int i = 0; i < length; i++) {
+		int digit = (value / divisor) % 83;
+		divisor /= 83;
+		*destination++ = characters[digit];
+	}
+	return destination;
+}
