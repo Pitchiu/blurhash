@@ -6,9 +6,10 @@ This project is blurhash implementation in NVIDIA CUDA
 ### Configuratrion
 
 *CPU*: Intel Xeon E5649 2.53 GHz
+
 *GPU*: NVIDIA TESLA K40
 
-Samples - 10 jpg images of size up to 1024 x 1024.
+Testing samples - 10 jpg images of size up to 1024 x 1024.
 
 ### Results
 Components:
